@@ -3,7 +3,7 @@ import multiprocessing as mp
 import time
 from functools import partial
 
-# 使用 dashscope（阿里云大模型服务）
+# Use dashscope (Alibaba Cloud large model service)
 from dashscope import Generation
 import backoff
 import pandas as pd
@@ -11,11 +11,11 @@ from tqdm import tqdm
 
 from llm_tools import LLMCache
 
-# 配置 Qwen-Plus 的 API Key
+# Configure Qwen-Plus API Key
 import os
-os.environ['DASHSCOPE_API_KEY'] = 'sk-846a6816c1144eeea8c256c6cfc3bfb2'  # 替换为你的 API Key
+os.environ['DASHSCOPE_API_KEY'] = 'sk-846a6816c1144eeea8c256c6cfc3bfb2'  # Replace with your API Key
 
-# Qwen-Plus 的 prompt
+# Qwen-Plus prompt
 prompt = (
     "We have two statements S1 (the premise) and S2 (the hypothesis). S1 entails S2.\n"
     "\n"
@@ -29,9 +29,9 @@ prompt = (
 )
 
 
-@backoff.on_exception(backoff.expo, Exception, max_time=600)  # 增加最大重试时间
+@backoff.on_exception(backoff.expo, Exception, max_time=600)  # Increase maximum retry time
 def call_qwen_backoff(s1, s2):
-    """调用 Qwen-Plus API 生成推理过程"""
+    """Call Qwen-Plus API to generate reasoning process"""
     response = Generation.call(
         model="qwen-plus",
         prompt=prompt.format(s1=s1, s2=s2),
@@ -44,7 +44,7 @@ def call_qwen_backoff(s1, s2):
 
 @backoff.on_exception(backoff.expo, Exception, max_time=600)
 def call_qwen_score(s1, s2, chain):
-    """调用 Qwen-Plus API 评分推理难度"""
+    """Call Qwen-Plus API to score reasoning difficulty"""
     score_prompt = (
         "Based on the reasoning steps, rate how hard it is to deduce S2 from S1.\n"
         "1: Very easy\n"
@@ -66,7 +66,7 @@ def call_qwen_score(s1, s2, chain):
 
 
 def cached_call_score_qwen(cache: LLMCache, s1, s2, chain):
-    """带缓存的评分调用"""
+    """Score call with cache"""
     key = f"{s1}---->{s2}"
     result = cache.get(key)
     if result is None:
@@ -76,7 +76,7 @@ def cached_call_score_qwen(cache: LLMCache, s1, s2, chain):
 
 
 def cached_call_cot_qwen(cache: LLMCache, s1, s2):
-    """带缓存的 CoT 调用"""
+    """CoT call with cache"""
     key = f"{s1}---->{s2}"
     result = cache.get(key)
     if result is None:
@@ -86,7 +86,7 @@ def cached_call_cot_qwen(cache: LLMCache, s1, s2):
 
 
 def cot_single_gpt35(args):
-    """单条数据的 CoT 生成（带错误处理）"""
+    """Single data CoT generation (with error handling)"""
     i, row, seed = args
     try:
         golden_statements = row["golden_statement"].split("||")
@@ -105,11 +105,11 @@ def cot_single_gpt35(args):
         return i, row, chains
     except Exception as e:
         print(f"Error processing row {i}: {str(e)}")
-        return i, row, []  # 返回空列表表示失败
+        return i, row, []  # Return empty list to indicate failure
 
 
 def score_single_gpt35(args):
-    """单条数据的评分（带错误处理）"""
+    """Single data scoring (with error handling)"""
     i, row, seed = args
     try:
         golden_statements = row["golden_statement"].split("||")
@@ -131,32 +131,32 @@ def score_single_gpt35(args):
         return i, row, scores
     except Exception as e:
         print(f"Error scoring row {i}: {str(e)}")
-        return i, row, []  # 返回空列表表示失败
+        return i, row, []  # Return empty list to indicate failure
 
 
 def run_cot_qwen():
-    """运行 CoT 生成（优化版）"""
+    """Run CoT generation (optimized version)"""
     df = pd.read_json("data/NQ-nli-qwen-plus-s42.json")
-    inputs = [(i, row, 42) for i, row in df.iterrows()]  # 固定 seed 保证可复现性
+    inputs = [(i, row, 42) for i, row in df.iterrows()]  # Fixed seed for reproducibility
 
-    # 使用单进程测试是否卡住（调试时取消注释）
+    # Use single process to test for deadlock (uncomment for debugging)
     # for i, row, chains in tqdm(map(cot_single_gpt35, inputs), total=len(inputs)):
     #     pass
 
-    # 多进程模式（限制进程数减少竞争）
-    with mp.Pool(4) as pool, open("data/cot-qwen.jsonl", "w") as f:  # 从 8 减少到 4
+    # Multiprocessing mode (limit process count to reduce contention)
+    with mp.Pool(4) as pool, open("data/cot-qwen.jsonl", "w") as f:  # Reduced from 8 to 4
         for i, row, chains in tqdm(
             pool.imap_unordered(cot_single_gpt35, inputs), 
             total=len(inputs),
             desc="Generating CoT"
         ):
-            output = dict(row)  # 复制原始数据
+            output = dict(row)  # Copy original data
             output["chains"] = chains
             f.write(json.dumps(output) + "\n")
 
 
 def run_score_qwen():
-    """运行评分（优化版）"""
+    """Run scoring (optimized version)"""
     df = pd.read_json("data/NQ-nli-qwen-plus-s42.json")
     inputs = [(i, row, 42) for i, row in df.iterrows()]
 
@@ -173,7 +173,7 @@ def run_score_qwen():
 
 if __name__ == "__main__":
 
-    # 运行主程序
+    # Run main program
     print("Running CoT generation...")
     run_cot_qwen()
     print("Running scoring...")
